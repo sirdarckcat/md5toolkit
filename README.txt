@@ -1,110 +1,101 @@
-README.txt
-Last updated:  1/04/2006
 
-This file is intended to supplement the code found in block1.c.
+MD5 Toolkit
+===========
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Building the Executable
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+This package contains code to produce MD5 collisions.  The core of the
+toolkit are the two programs, 'block1' and 'block2'.
 
-To build the binary, just type 'make' at the command line, or use the command
+block1 produces a pair M_1 and M'_1 of 512-bit blocks that satisfy the
+Wang-differential.  It also produces the MD5 chaining value for M_1.
 
-        gcc -O3 -march=pentium4 block1.c -o block1
+block2 needs only the M_1 chaining value (the M'_1 chaining value can
+be determined from it), and it then outputs a pair M_2 and M'_2.  
 
-where the '-march=' flag is changed to the appropriate value.  On the
-Pentium 4, use of this flag makes the code roughly twice as fast compared
-to a binary compiled without specifying the architecture.  You can also
-use the build.sh script supplied to build the entire toolkit.
+At the end, we have that M_1 || M_2  collides with  M'_1 || M'_2
+under MD5.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Usage
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Auxiliary Programs
+==================
 
-The code can either use the default IV for MD5, or it can take the
-IV as a paramter.  In the former case, the code is invoked by
+Both block1 and block2 output their results in ASCII.  The program
+'makeblocks' converts the output from these programs into two binary
+files so that MD5 can be run on them ('md5sum' is the typical program
+used for Linux installations).
 
-        ./block1
+A shell script 'makebins.sh' is also provided in the makeblocks/
+directory, which does all the steps needed to produce a sample collision.
 
-and in the latter case the code is invoked by
+makebins.sh first runs block1, saving its output in a file 'block1.out'.
+Then it runs 'block2' and saves its output in 'block2.out'.  Appending
+these outputs into a single file, it hands them to 'makeblocks' along
+with output filenames b1.bin and b2.bin.
 
-        ./block 1 <IV>
-
-where IV is any hex value of length 32.  As an example, one might invoke the
-code as follows:
-
-        ./block1 d41d8cd98f00b204e9800998ecf8427e
+b1.bin and b2.bin are distinct files, each 1024-bits long, which collide
+under MD5.  md5sum is run on each of these files and the user may verify
+the digests are the same.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-Output
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Building the Code
+=================
 
-The output to the program consists of three parts: the output of the
-MD5 compression function on the first of two messages, M and M', and
-then the two 512-bit messages M and M' themselves,
-represented as a 16-tuple of 32-bit hex values.
+sh build.sh
 
-As an example run, we obtained the following output:
+builds all the code.
 
-    Chaining value for M:
-    ef5f6cf37991e593628c40e6794a54b9
-    M = {   87e85516, 9f820a2d, 1d2c1ea0, 891cc06e, 
-            b50347ae, 364a887c, 3ada98ae, 62468e31, 
-            05352d45, 21333bfe, 8c9ef6b7, 269a3354, 
-            6043a0c7, 3f98a2f4, ab400728, 3a995dcd }
 
-    M' = {  87e85516, 9f820a2d, 1d2c1ea0, 891cc06e, 
-            350347ae, 364a887c, 3ada98ae, 62468e31, 
-            05352d45, 21333bfe, 8c9ef6b7, 269ab354, 
-            6043a0c7, 3f98a2f4, 2b400728, 3a995dcd }
 
-This output is a pair of first-blocks of what will be a pair of two-block
-messages that collide under MD5.  The differential is the Wang-differential,
-but several more conditions were specified to speed up the algorithm as
-described in the accompanying paper (and see below).
+Efficiency
+==========
 
-The chaining value for M is all that is needed in order to produce a pair
-of second-blocks to complete the collision-pair.  The chaining value above
-is given to a separate program (aptly named 'block2') to accomplish this.
-When M from this program is prepended to M from the block2 program we get
-a two-block message X.  When M' from this program is prepended to M' from
-the block2 program, we get a distinct two-block message Y.  X and Y will
-collide under MD5.
+The speed of the code, as usual, depends on several factors: the hardware
+used, the quality of the compiler, and how well the code has been tuned.
+(This under the understanding that the basic algorithm remains the same.)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-md5cond_1.txt
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+We have tested the code on a Pentium4 (Xeon) with g++ 3.4.4.  (Other
+architectures can be specified in the build.sh file.)  The code
+was also tested with the Intel icc compiler, and it runs significantly
+faster, but this compiler is not as widely available, so we've stuck
+to g++ for our Makefiles.
 
-This file contains the list of conditions on the step values computed during
-the computation of the MD5 compression function.  For 'normal' use of the
-code, no modifications of md5cond_1.txt are necessary.  That is, the file
-contains an encoding of all the conditions present in the associated
-paper.  One may wish to change md5cond_1.txt only to experiment with
-new conditions or to examine the effect on code running-time when various
-conditions are manipulated, created, or removed.
+The code has not yet been tuned anywhere near its potential.  Currently,
+in the environment cited above, the block1 code runs typically from 8 to
+50 minutes before producing a collision.  The block2 code runs about 3 seconds
+to 5 minutes, typically.  Running 100 trials of each program, we've 
+measured 16 mins as the average time for block1 and 2 mins for the average
+time for block2 (with large variations, however).
 
-Format:
-Each line of the file encodes one condition and is composed of five
-space-delimited numbers.  The first number denotes the step number of the
-condition, with acceptable values of 0-63 (68-71 are used for the conditions
-on the chaining values).  The second number denotes the index of the bit of
-the condition (values 0-31).  The third value denotes either the value of
-that bit (-2 means that bit should be zero, and -1 means that bit should be
-one) or the index of the step value that it should be compared to.  The
-fourth and fifth values are used only when the condition refers to another
-step value and they represent the bit index and additive constant to that
-value, respectively.
+Therefore we expect to see collisions in under 20 mins, though sometimes
+much slower or much faster.
 
-Examples:
-3 5 -2 0 0
-Bit 5 on step value 3 should be 0.
+Tuning the code makes things run much faster.  Using the faster code from
+http://www.stachliu.com/collisions.html
+for the block1 algorithm allows us to produce collisions in about 11 minutes.
+Efforts are underway to tune the code for both blocks; preliminary results
+show we can expect collisions in about 5 mins.
 
-27 31 -1 0 0
-Bit 31 on step value 27 should be 1.
+Wang's original code ran in about an hour on an IBM P690 supercomputer.
+The Stach-Liu code cited above runs in about 45 minutes on a Pentium4,
+however their code sometimes produces block1 pairs that have no block2
+solutions (our code never does this).
 
-15 31 14 31 0
-Bit 31 on step value 15 should be the same as bit 31 on step value 14.
 
-63 31 61 31 1
-Bit 31 on step value 63 should be the opposite of bit 31 on step value 61.
+Applications
+============
+
+We designed the toolkit so that it would be easy to generates various
+flavors of collisions.  For example, many collisions where the first
+blocks are the same between a given pair, but the second blocks vary.
+(We can get lots of these fast because our block2 code is quite fast
+even before we have tuned it much.)
+
+Also, we can generate collisions for arbitrary IVs.  This is useful for
+attacks like the Daum-Lucks attack (http://www.cits.rub.de/MD5Collisions).
+As an application of their idea we produced two binaries that have the
+same MD5 digest but where binary1 prints "hello world" and binary2 
+prints "I am erasing your hard disk" (even though are program really doesn't
+erase your hard disk).  This is done by having the program check to see
+whether msg1 is in a given array, or msg2 is (where msg1 and msg2 are 
+1024-bit values that collide under MD5 with the chaining value resulting
+from hashing the binary to the point where the msg1 or msg2 value occurs).
+
